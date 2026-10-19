@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>I2C Chatbot Widget — Preview</title>
+<style>
+  body {
+    margin: 0;
+    font-family: sans-serif;
+    background: #f0f2f0;
+    min-height: 100vh;
+  }
+  .preview-note {
+    position: fixed;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(135deg, #4A3C8C, #2D8C6E);
+    color: #EEF0FF;
+    font-size: 13px;
+    padding: 8px 20px;
+    border-radius: 20px;
+    z-index: 100;
+    white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+
+<div class="preview-note">Preview — виж чатбота долу вдясно</div>
+
+<!-- ============================================================
+     I2C CHATBOT WIDGET
+     
+     За да вградиш в Webflow:
+     1. Отиди на Pages → Settings → Custom Code → Before </body> tag
+     2. Копирай целия блок от <!-- I2C WIDGET START --> до <!-- I2C WIDGET END -->
+     3. Замени ANTHROPIC_API_KEY с твоя реален ключ (или proxy endpoint)
+     ============================================================ -->
+
+<!-- I2C WIDGET START -->
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400&display=swap');
+
+#i2c-widget-btn {
+  position: fixed;
+  bottom: 28px;
+  right: 28px;
+  width: 56px;
+  height: 56px;
+  background: linear-gradient(135deg, #4A3C8C, #2D8C6E);
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9998;
+  box-shadow: 0 4px 20px rgba(15,110,86,0.35);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+#i2c-widget-btn:hover {
+  transform: scale(1.07);
+  box-shadow: 0 6px 28px rgba(15,110,86,0.45);
+}
+#i2c-widget-btn svg {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+#i2c-widget-btn.open .icon-chat { opacity: 0; transform: scale(0.7); position: absolute; }
+#i2c-widget-btn.open .icon-close { opacity: 1; transform: scale(1); }
+#i2c-widget-btn .icon-close { opacity: 0; transform: scale(0.7); position: absolute; }
+
+#i2c-widget-panel {
+  position: fixed;
+  bottom: 96px;
+  right: 28px;
+  width: 360px;
+  height: 520px;
+  background: #ffffff;
+  border-radius: 18px;
+  border: 0.5px solid rgba(0,0,0,0.1);
+  box-shadow: 0 12px 48px rgba(0,0,0,0.14);
+  display: flex;
+  flex-direction: column;
+  z-index: 9999;
+  font-family: 'DM Sans', sans-serif;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(16px) scale(0.97);
+  pointer-events: none;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+#i2c-widget-panel.open {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: all;
+}
+
+.i2c-header {
+  background: linear-gradient(135deg, #4A3C8C, #2D8C6E);
+  padding: 16px 18px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.i2c-header-avatar {
+  width: 34px;
+  height: 34px;
+  background: rgba(255,255,255,0.15);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 500;
+  color: #EEF0FF;
+  letter-spacing: -0.3px;
+}
+.i2c-header-info { flex: 1; }
+.i2c-header-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #ffffff;
+  margin: 0;
+  line-height: 1.2;
+}
+.i2c-header-status {
+  font-size: 11px;
+  color: #B8AEED;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 2px;
+}
+.i2c-status-dot {
+  width: 6px;
+  height: 6px;
+  background: #2D8C6E;
+  border-radius: 50%;
+}
+
+.i2c-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  scroll-behavior: smooth;
+}
+.i2c-messages::-webkit-scrollbar { width: 4px; }
+.i2c-messages::-webkit-scrollbar-track { background: transparent; }
+.i2c-messages::-webkit-scrollbar-thumb { background: #d0d0d0; border-radius: 2px; }
+
+.i2c-msg {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  animation: msgIn 0.2s ease;
+}
+@keyframes msgIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.i2c-msg.user { flex-direction: row-reverse; }
+
+.i2c-msg-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #EEF0FF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 500;
+  color: #4A3C8C;
+  flex-shrink: 0;
+}
+.i2c-msg.user .i2c-msg-avatar {
+  background: #f0f0f0;
+  color: #888;
+}
+
+.i2c-bubble {
+  max-width: 260px;
+  padding: 10px 13px;
+  border-radius: 14px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #1a1a1a;
+  background: #f3f4f3;
+}
+.i2c-msg.bot .i2c-bubble {
+  background: #f3f4f3;
+  border-bottom-left-radius: 4px;
+}
+.i2c-msg.user .i2c-bubble {
+  background: #2D8C6E;
+  color: #ffffff;
+  border-bottom-right-radius: 4px;
+}
+
+.i2c-typing {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  padding: 12px 13px;
+}
+.i2c-typing span {
+  width: 6px;
+  height: 6px;
+  background: #2D8C6E;
+  border-radius: 50%;
+  animation: bounce 1.2s infinite ease-in-out;
+}
+.i2c-typing span:nth-child(2) { animation-delay: 0.2s; }
+.i2c-typing span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes bounce {
+  0%, 80%, 100% { transform: translateY(0); }
+  40% { transform: translateY(-5px); }
+}
+
+.i2c-suggestions {
+  padding: 0 16px 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.i2c-chip {
+  font-size: 11px;
+  font-family: 'DM Sans', sans-serif;
+  background: #ffffff;
+  border: 0.5px solid #D5D0F0;
+  color: #4A3C8C;
+  border-radius: 20px;
+  padding: 5px 11px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  white-space: nowrap;
+}
+.i2c-chip:hover {
+  background: #EEF0FF;
+  border-color: #7C6BC9;
+}
+
+.i2c-input-row {
+  padding: 10px 14px 14px;
+  display: flex;
+  gap: 8px;
+  border-top: 0.5px solid #eee;
+  flex-shrink: 0;
+  align-items: flex-end;
+}
+#i2c-input {
+  flex: 1;
+  border: 0.5px solid #d8d8d8;
+  border-radius: 10px;
+  padding: 9px 13px;
+  font-size: 13px;
+  font-family: 'DM Sans', sans-serif;
+  color: #1a1a1a;
+  resize: none;
+  outline: none;
+  line-height: 1.4;
+  max-height: 80px;
+  overflow-y: auto;
+  transition: border-color 0.15s ease;
+  background: #fafafa;
+}
+#i2c-input:focus { border-color: #7C6BC9; background: #fff; }
+#i2c-input::placeholder { color: #aaa; }
+
+#i2c-send {
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, #4A3C8C, #2D8C6E);
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+#i2c-send:hover { transform: scale(1.08); }
+#i2c-send:disabled { opacity: 0.4; cursor: default; transform: none; }
+
+.i2c-footer {
+  text-align: center;
+  padding: 0 14px 10px;
+  font-size: 10px;
+  color: #bbb;
+  font-family: 'DM Mono', monospace;
+  flex-shrink: 0;
+}
+</style>
+
+<!-- Trigger button -->
+<button id="i2c-widget-btn" aria-label="Open I2C assistant">
+  <!-- Chat icon -->
+  <svg class="icon-chat" width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke="#EEF0FF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="9" cy="10" r="1" fill="#EEF0FF"/>
+    <circle cx="12" cy="10" r="1" fill="#EEF0FF"/>
+    <circle cx="15" cy="10" r="1" fill="#EEF0FF"/>
+  </svg>
+  <!-- Close icon -->
+  <svg class="icon-close" width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M18 6L6 18M6 6l12 12" stroke="#EEF0FF" stroke-width="2" stroke-linecap="round"/>
+  </svg>
+</button>
+
+<!-- Chat panel -->
+<div id="i2c-widget-panel" role="dialog" aria-label="I2C Assistant">
+  <div class="i2c-header">
+    <div class="i2c-header-avatar">I2C</div>
+    <div class="i2c-header-info">
+      <p class="i2c-header-name">I2C Assistant</p>
+      <div class="i2c-header-status">
+        <div class="i2c-status-dot"></div>
+        Online · Ask me anything
+      </div>
+    </div>
+  </div>
+
+  <div class="i2c-messages" id="i2c-messages"></div>
+
+  <div class="i2c-suggestions" id="i2c-suggestions">
+    <button class="i2c-chip" data-q="What is I2C and what does it do?">What is I2C?</button>
+    <button class="i2c-chip" data-q="How does direct debit integration work in I2C?">Direct debit</button>
+    <button class="i2c-chip" data-q="What's new in the latest I2C release?">Latest release</button>
+    <button class="i2c-chip" data-q="How does I2C differ from INIO?">I2C vs INIO</button>
+  </div>
+
+  <div class="i2c-input-row">
+    <textarea id="i2c-input" placeholder="Ask about features, releases…" rows="1"></textarea>
+    <button id="i2c-send" aria-label="Send">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+        <path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z" stroke="#EEF0FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+  </div>
+  <div class="i2c-footer">Powered by Claude · eCollect I2C</div>
+</div>
+
+<script>
+(function() {
+  // ── CONFIGURATION ──────────────────────────────────────────────
+  // ВАЖНО: Замени с реален Anthropic API ключ или твой proxy URL
+  // Препоръчително: използвай собствен backend proxy, за да не
+  // излагаш API ключа публично в Webflow!
+  const API_KEY = 'YOUR_ANTHROPIC_API_KEY';
+  const API_URL = 'https://api.anthropic.com/v1/messages';
+
+  // Системен промпт — описва какво знае асистентът за I2C
+  // Добави тук съдържание от release notes, feature описания и т.н.
+  const SYSTEM_PROMPT = `You are a helpful assistant for I2C — an Invoice-to-Cash platform built by eCollect.
+You help potential clients and existing users understand the product.
+
+Key facts about I2C:
+- I2C is a B2B software platform for automating the full invoice-to-cash lifecycle
+- It handles invoice management, collections, direct debit, EBICS banking integration, and customer communication
+- It supports multi-tenancy — multiple clients can use the platform independently
+- The companion platform is called INIO (for instalment management)
+- Latest version is I2C v1.7, which includes enhanced EBICS integration, improved instalment agreement flows, and 14 bug fixes
+
+Be concise, professional, and helpful. Answer in the same language the user writes in. 
+If asked something you don't know, say so and suggest contacting the eCollect team directly.`;
+  // ───────────────────────────────────────────────────────────────
+
+  const btn   = document.getElementById('i2c-widget-btn');
+  const panel = document.getElementById('i2c-widget-panel');
+  const msgs  = document.getElementById('i2c-messages');
+  const input = document.getElementById('i2c-input');
+  const send  = document.getElementById('i2c-send');
+  const chips = document.getElementById('i2c-suggestions');
+
+  let history = [];
+  let isOpen = false;
+  let isLoading = false;
+
+  // Welcome message
+  addMessage('bot', 'Hello! I\'m the I2C assistant. I can help you understand our invoice-to-cash platform — features, integrations, releases, and more. What would you like to know?');
+
+  // Toggle panel
+  btn.addEventListener('click', () => {
+    isOpen = !isOpen;
+    panel.classList.toggle('open', isOpen);
+    btn.classList.toggle('open', isOpen);
+    if (isOpen) { input.focus(); scrollToBottom(); }
+  });
+
+  // Suggestion chips
+  chips.addEventListener('click', e => {
+    const chip = e.target.closest('.i2c-chip');
+    if (!chip) return;
+    const q = chip.dataset.q;
+    if (q) sendMessage(q);
+  });
+
+  // Send on button click
+  send.addEventListener('click', () => {
+    const text = input.value.trim();
+    if (text && !isLoading) sendMessage(text);
+  });
+
+  // Send on Enter (Shift+Enter for newline)
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      const text = input.value.trim();
+      if (text && !isLoading) sendMessage(text);
+    }
+  });
+
+  // Auto-resize textarea
+  input.addEventListener('input', () => {
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 80) + 'px';
+  });
+
+  async function sendMessage(text) {
+    if (isLoading) return;
+
+    addMessage('user', text);
+    history.push({ role: 'user', content: text });
+    input.value = '';
+    input.style.height = 'auto';
+    chips.style.display = 'none';
+
+    const typingEl = addTyping();
+    setLoading(true);
+
+    try {
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': API_KEY,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true'
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 600,
+          system: SYSTEM_PROMPT,
+          messages: history
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.error) throw new Error(data.error.message);
+
+      const reply = data.content?.[0]?.text || 'Sorry, I could not generate a response.';
+      history.push({ role: 'assistant', content: reply });
+
+      typingEl.remove();
+      addMessage('bot', reply);
+
+    } catch (err) {
+      typingEl.remove();
+      addMessage('bot', 'Something went wrong. Please try again or contact eCollect directly.');
+      console.error('I2C widget error:', err);
+    }
+
+    setLoading(false);
+  }
+
+  function addMessage(role, text) {
+    const wrap = document.createElement('div');
+    wrap.className = `i2c-msg ${role}`;
+
+    const avatar = document.createElement('div');
+    avatar.className = 'i2c-msg-avatar';
+    avatar.textContent = role === 'bot' ? 'AI' : 'You';
+
+    const bubble = document.createElement('div');
+    bubble.className = 'i2c-bubble';
+    bubble.textContent = text;
+
+    wrap.appendChild(avatar);
+    wrap.appendChild(bubble);
+    msgs.appendChild(wrap);
+    scrollToBottom();
+    return wrap;
+  }
+
+  function addTyping() {
+    const wrap = document.createElement('div');
+    wrap.className = 'i2c-msg bot';
+    wrap.innerHTML = `
+      <div class="i2c-msg-avatar">AI</div>
+      <div class="i2c-bubble"><div class="i2c-typing"><span></span><span></span><span></span></div></div>`;
+    msgs.appendChild(wrap);
+    scrollToBottom();
+    return wrap;
+  }
+
+  function setLoading(val) {
+    isLoading = val;
+    send.disabled = val;
+    input.disabled = val;
+  }
+
+  function scrollToBottom() {
+    setTimeout(() => { msgs.scrollTop = msgs.scrollHeight; }, 50);
+  }
+})();
+</script>
+<!-- I2C WIDGET END -->
+
+</body>
+</html>
